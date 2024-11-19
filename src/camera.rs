@@ -99,6 +99,7 @@ impl<'a> Camera<'a> {
 impl<'a> FrameSource for Camera<'a> {
     fn get_frame(&self) -> ndarray::Array2<[u8; 3]> {
         ndarray::arr2::<_, 0>(&[])
+
     }
 
     fn frame_size(&self) -> (usize, usize) {
