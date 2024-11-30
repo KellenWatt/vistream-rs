@@ -1,0 +1,9 @@
+[package]
+name = "vistream-camera-server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+argparse = "0.2.2"
+libcamera = "0.3.0"
+vistream-protocol = { version = "0.1.0", path = "../protocol" }
