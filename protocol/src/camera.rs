@@ -38,11 +38,14 @@ impl FromStr for PixelFormat {
     type Err = String;
 
     fn from_str(s: &str) -> Result<PixelFormat, Self::Err> {
-        match s {
-            "BG24" => Ok(PixelFormat::RGB),
-            "RG24" => Ok(PixelFormat::BGR),
-            "BA24" => Ok(PixelFormat::RGBA),
-            "RA24" => Ok(PixelFormat::BGRA),
+        let s = s.to_uppercase();
+        // Yes, these are technically backward, however, these are the "true" FourCC codes
+        // corresponding to the formats, and the fourcc impl deals with the weirdness
+        match s.as_str() {
+            "RG24" => Ok(PixelFormat::RGB),
+            "BG24" => Ok(PixelFormat::BGR),
+            "RA24" => Ok(PixelFormat::RGBA),
+            "BA24" => Ok(PixelFormat::BGRA),
             "YUYV" => Ok(PixelFormat::YUYV),
             "MJPG" => Ok(PixelFormat::MJPEG),
             _ => Err(format!("not a recognized fourcc code ({})", s)),

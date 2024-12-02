@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-argparse = "0.2.2"
+clap = { version = "4.5.21", features = ["derive"] }
 libcamera = "0.3.0"
 vistream-protocol = { version = "0.1.0", path = "../protocol" }
