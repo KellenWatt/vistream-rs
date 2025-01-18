@@ -5,5 +5,9 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.5.21", features = ["derive"] }
+ctrlc = { version = "3.4.5", features = ["termination"] }
 libcamera = "0.3.0"
+rmp = "0.8.14"
+rmp-serde = "1.3.0"
+serde = "1.0.216"
 vistream-protocol = { version = "0.1.0", path = "../protocol" }
