@@ -85,6 +85,18 @@ fn pseudo_main() -> VisResult<()> {
                 }
             }
         }
+
+        parser::Command::Stop(stop) => {
+            let name = full_resolve_name(stop.name)?;
+            let pids = get_camera_pids()?;
+            let Some(pid) = pids.get(&name)  else {
+                fail!(20, "Camera not found (is it running?)");
+            };
+            match std::process::Command::new("kill").arg(pid.to_string()).output() {
+                Ok(_) => {/* no-op */}
+                Err(_) => {fail!(20, "Camera could not be killed (is it running?)");}
+            }
+        }
     }
 
     Ok(())

@@ -53,6 +53,13 @@ impl PixelFormat for MJPG {
     fn proto_format() -> ProtoPixelFormat {ProtoPixelFormat::MJPEG}
 }
 
+#[derive(Clone, Copy)]
+pub struct Raw<const N: usize>;
+impl<const N: usize> PixelFormat for Raw<N> {
+    fn byte_count() -> usize {N}
+    fn proto_format() -> ProtoPixelFormat {panic!("Raw<{}> does not translate to PixelFormat", N)}
+}
+
 
 pub struct Pixel<'a, F: PixelFormat> {
     data: *const u8,

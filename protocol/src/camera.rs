@@ -42,10 +42,10 @@ impl FromStr for PixelFormat {
         // Yes, these are technically backward, however, these are the "true" FourCC codes
         // corresponding to the formats, and the fourcc impl deals with the weirdness
         match s.as_str() {
-            "RG24" => Ok(PixelFormat::RGB),
-            "BG24" => Ok(PixelFormat::BGR),
-            "RA24" => Ok(PixelFormat::RGBA),
-            "BA24" => Ok(PixelFormat::BGRA),
+            "RG24" => Ok(PixelFormat::BGR),
+            "BG24" => Ok(PixelFormat::RGB),
+            "RA24" => Ok(PixelFormat::BGRA),
+            "BA24" => Ok(PixelFormat::RGBA),
             "YUYV" => Ok(PixelFormat::YUYV),
             "MJPG" => Ok(PixelFormat::MJPEG),
             _ => Err(format!("not a recognized fourcc code ({})", s)),
@@ -54,12 +54,12 @@ impl FromStr for PixelFormat {
 }
 
 #[derive(Serialize, Deserialize)]
-pub struct Frame<'a> {
+pub struct Frame {
     pub format: PixelFormat,
     pub width: u32,
     pub height: u32,
     #[serde(with = "serde_bytes")]
-    pub data: &'a [u8],
+    pub data: Vec<u8>,
 }
 
 

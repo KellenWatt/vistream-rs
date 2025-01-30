@@ -91,7 +91,7 @@ pub fn save_aliases(h: HashMap<String, String>) -> VisResult<()> {
     };
 
     for (k, v) in h.iter() {
-        unwrap_or_fail!(4, file.write(format!("{}={}", k, v).as_bytes()));
+        unwrap_or_fail!(4, file.write(format!("{}={}\n", k, v).as_bytes()));
     }
     Ok(())
 }
@@ -117,6 +117,33 @@ pub fn get_or_make_known_camera_file() -> VisResult<PathBuf> {
     let known_file = cam_home.join("acquired");
 
     Ok(known_file)
+}
+
+pub fn get_camera_pid_file() -> VisResult<PathBuf> {
+    let cam_home = get_camera_home()?;
+    let pid_file = cam_home.join("pids");
+    Ok(pid_file)
+}
+
+pub fn get_or_make_camera_pid_file() -> VisResult<PathBuf> {
+    let cam_home = get_camera_home()?;
+    if !cam_home.is_dir() {
+        unwrap_or_fail!(1, std::fs::create_dir(&cam_home));
+    }
+    let pid_file = cam_home.join("pids");
+
+    Ok(pid_file)
+}
+
+pub fn get_camera_pids() -> VisResult<HashMap<String, u32>> {
+    let pid_file = get_camera_pid_file()?;
+    Ok(match read_to_string(pid_file) {
+        Ok(s) => s.lines().map(|l|{
+                    let (c, id) = l.split_once(" :: ").unwrap();
+                    (c.to_string(), id.parse::<u32>().unwrap())
+                }).collect(),
+        Err(_) => HashMap::new(),
+    })
 }
 
 pub fn get_used_cameras() -> VisResult<Vec<String>> {

@@ -52,36 +52,48 @@ pub trait FrameSource<F: frame::PixelFormat> {
     fn last_frame_id(&self) -> usize;
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(Default, Clone)]
 pub struct CameraConfig {
     buffer_count: Option<u32>,
     width: Option<u32>,
     height: Option<u32>,
     resize: bool,
+    server_exe: Option<String>,
+    conn_timeout: Option<std::time::Duration>,
 }
 
 impl CameraConfig {
-    fn new() -> CameraConfig {
+    pub fn new() -> CameraConfig {
         CameraConfig::default()
     }
 
-    fn buffer_count(&mut self, count: u32) -> &mut Self {
+    pub fn buffer_count(&mut self, count: u32) -> &mut Self {
         self.buffer_count = (count != 0).then_some(count);
         self
     }
 
-    fn width(&mut self, width: u32) -> &mut Self {
+    pub fn width(&mut self, width: u32) -> &mut Self {
         self.width = (width != 0).then_some(width);
         self
     }
 
-    fn height(&mut self, height: u32) -> &mut Self {
+    pub fn height(&mut self, height: u32) -> &mut Self {
         self.height = (height != 0).then_some(height);
         self
     }
 
-    fn resize(&mut self, resize_if_wrong: bool) -> &mut Self {
+    pub fn resize(&mut self, resize_if_wrong: bool) -> &mut Self {
         self.resize = resize_if_wrong;
+        self
+    }
+
+    pub fn server_exe(&mut self, exe_name: &str) -> &mut Self {
+        self.server_exe = Some(exe_name.to_owned());
+        self
+    }
+
+    pub fn conn_timeout(&mut self, timeout: std::time::Duration) -> &mut Self {
+        self.conn_timeout = Some(timeout);
         self
     }
 }
@@ -173,24 +185,25 @@ pub struct Camera<F: frame::PixelFormat + 'static> {
 
 impl<F: frame::PixelFormat> Camera<F> {
     pub fn new(name: &str, cfg: CameraConfig) -> Result<Camera<F>> {
-        let resolved_name_cmd = Command::new("vistream-camera-server").args(["resolve", name]).output()?;
+        let server_exe = cfg.server_exe.unwrap_or("vistream-camera-server".into());
+        let resolved_name_cmd = Command::new(&server_exe).args(["resolve", name]).output()?;
 
-        if resolved_name_cmd.status.success() {
+        if !resolved_name_cmd.status.success() {
             return Err(Error::Server(String::from_utf8_lossy(&resolved_name_cmd.stderr).to_string()));
         }
 
         let true_name = std::str::from_utf8(&resolved_name_cmd.stdout).map_err(|_| {
             Error::Server(String::from_utf8_lossy(&resolved_name_cmd.stderr).to_string())
-        })?;
+        })?.trim();
 
-        let res = Command::new("vistream-camera-server")
+        let res = Command::new(&server_exe)
             .arg("check")
             .arg(&true_name)
             .arg("--quiet")
             .output()?;
    
         let cam_proc = if res.status.success() {
-            let mut cmd = Command::new("vistream-camera-server");
+            let mut cmd = Command::new(&server_exe);
             cmd.arg("launch");
             cmd.arg("--format");
             cmd.arg(std::str::from_utf8(&F::proto_format().fourcc()).unwrap());
@@ -212,14 +225,31 @@ impl<F: frame::PixelFormat> Camera<F> {
             // possible race condition. For now, just assume it works.
         } else { None };
         
+        std::thread::sleep(std::time::Duration::from_millis(10));
         let addr = SocketAddr::from_abstract_name(&true_name)?;
-        let mut source = UnixStream::connect_addr(&addr)?;
+        let mut source = None;
+        let start = std::time::Instant::now();
+        while source.is_none() {
+            if let Ok(conn) =  UnixStream::connect_addr(&addr) {
+                source = Some(conn);
+            }
+            if let Some(ref timeout) = cfg.conn_timeout {
+                if &start.elapsed() >= timeout {
+                    return Err(Error::Timeout);
+                }
+            }
+        }
+        // let mut source = UnixStream::connect_addr(&addr)?;
+        let mut source = source.unwrap();
 
         //  TODO make the Resizer
         // - image size - set up resizer if necessary
 
         source.write(&[ClientMessage::Status.id()])?;
         let status = Status::deserialize(&mut Deserializer::new(&source))?;
+
+        println!("{:?}", F::proto_format());
+        println!("{:?}", status);
 
         // if request fails or has wrong format, die
         // if camera process is a child upon death, kill and reap it before death
@@ -331,6 +361,10 @@ impl<F: frame::PixelFormat> Drop for Camera<F> {
     fn drop(&mut self) {
         if !self.frame_worker.is_finished() {
             let _ = self.control.write(&[ClientMessage::Disconnect.id()]);
+            self.frame_worker.kill();
+            self.frame_worker.join();
+        } else {
+            self.frame_worker.join();
         }
     }
 }

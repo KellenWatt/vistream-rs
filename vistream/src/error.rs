@@ -12,6 +12,8 @@ pub enum Error {
     Unknown,
     #[error("source was corrupted")]
     CorruptSource,
+    #[error("camera connection timeout")]
+    Timeout,
 
     #[error("server error: {0}")]
     Server(String),

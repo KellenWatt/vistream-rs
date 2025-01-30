@@ -20,6 +20,8 @@ pub enum Command {
     Resolve(Resolve),
     /// List the status of a given camera.
     Check(Check),
+    /// Attempt to stop a running camera.
+    Stop(Stop),
 }
 
 #[derive(ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
@@ -126,4 +128,10 @@ pub struct Check {
     /// Silences any output, using only the return code
     #[arg(long, short)]
     pub quiet: bool,
+}
+
+#[derive(Args)]
+pub struct Stop {
+    /// name or alias of the camera to be stopped
+    pub name: String,
 }

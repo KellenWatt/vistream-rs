@@ -110,6 +110,7 @@ impl LocateStream {
             while !kill_flag.load(Ordering::Acquire) {
                 match socket.accept() {
                     Ok(conn) => {
+                        println!("connection get! from {}", conn.1);
                         connections.push(Connection::new(conn));
                     }
                     Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
@@ -136,14 +137,15 @@ impl LocateStream {
                     // listen for messages from, respond accordingly
                     // if conn active and healthy, send loc
                     let mut buf = [0u8];
-                    match conn.try_read(&mut buf)? {
-                        Some(1) => {
+                    match conn.try_read(&mut buf) {
+                        Ok(Some(1)) => {
                             // respond as appropriate
                             match ClientMessage::from_id(buf[0]) {
-                                Some(ClientMessage::Start) => conn.activate(),
-                                Some(ClientMessage::Stop) => conn.deactivate(),
-                                Some(ClientMessage::Disconnect) => conn.poison(),
+                                Some(ClientMessage::Start) => {println!("client starting"); conn.activate()},
+                                Some(ClientMessage::Stop) => {println!("client stopping"); conn.deactivate()},
+                                Some(ClientMessage::Disconnect) => {println!("client disconnecting"); conn.poison()},
                                 Some(ClientMessage::Status) => {
+                                    println!("client requesting status");
                                     let resp = make_response(ClientMessage::Status, Status {
                                         enabled: conn.is_active(),
                                         healthy: conn.is_healthy(),
@@ -151,12 +153,13 @@ impl LocateStream {
                                     }).map_err(|_| Error::Unknown)?;
                                     conn.write(&resp)?;
                                 }
-                                None => {/* silently ignore */}
+                                None => {println!("don't know what I got")/* silently ignore */}
                             }
                         }
-                        Some(0) => {/* ignore? */}
-                        Some(_) => unreachable!(),
-                        None => {/* do nothing */}
+                        Ok(Some(0)) => {/* ignore? */}
+                        Ok(Some(_)) => unreachable!(),
+                        Ok(None) => {/* do nothing */}
+                        Err(_) => {println!("something went wrong with the connection");conn.poison();}
                     }
 
                     if !conn.is_active() {
@@ -167,7 +170,7 @@ impl LocateStream {
                 }
             }
 
-            Err(Error::Unknown)
+            Ok(())
         });
         LocateStream {
             worker
@@ -268,7 +271,7 @@ impl FrameStream {
                 }
             }
 
-            Err(Error::Unknown)
+            Ok(())
         });
         FrameStream {
             worker

@@ -29,48 +29,48 @@ pub struct LocationDataBuilder {
 
 #[allow(dead_code)]
 impl LocationDataBuilder {
-    fn new() -> LocationDataBuilder {
+    pub fn new() -> LocationDataBuilder {
         LocationDataBuilder::default()
     }
 
-    fn x(&mut self, x: f64) -> &mut Self {
+    pub fn x(&mut self, x: f64) -> &mut Self {
         self.x = Some(x);
         self
     }
-    fn y(&mut self, y: f64) -> &mut Self {
+    pub fn y(&mut self, y: f64) -> &mut Self {
         self.y = Some(y);
         self
     }
-    fn z(&mut self, z: f64) -> &mut Self {
+    pub fn z(&mut self, z: f64) -> &mut Self {
         self.z = Some(z);
         self
     }
-    fn width(&mut self, width: f64) -> &mut Self {
+    pub fn width(&mut self, width: f64) -> &mut Self {
         self.width = Some(width);
         self
     }
-    fn height(&mut self, height: f64) -> &mut Self {
+    pub fn height(&mut self, height: f64) -> &mut Self {
         self.height = Some(height);
         self
     }
-    fn yaw(&mut self, yaw: f64) -> &mut Self {
+    pub fn yaw(&mut self, yaw: f64) -> &mut Self {
         self.yaw = Some(yaw);
         self
     }
-    fn pitch(&mut self, pitch: f64) -> &mut Self {
+    pub fn pitch(&mut self, pitch: f64) -> &mut Self {
         self.pitch = Some(pitch);
         self
     }
-    fn roll(&mut self, roll: f64) -> &mut Self {
+    pub fn roll(&mut self, roll: f64) -> &mut Self {
         self.roll = Some(roll);
         self
     }
-    fn id(&mut self, id: u32) -> &mut Self {
+    pub fn id(&mut self, id: u32) -> &mut Self {
         self.id = Some(id);
         self
     }
     
-    fn build(self) -> Result<LocationData, &'static str> {
+    pub fn build(self) -> Result<LocationData, &'static str> {
         Ok(LocationData {
             x: self.x.ok_or("x coordinate required")?,
             y: self.y.ok_or("y coordinate required")?,

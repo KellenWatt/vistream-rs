@@ -108,6 +108,7 @@ impl Connection {
     }
 
     fn poison(&mut self) {
+        // println!("server: poisoning connection");
         self.healthy = false;
         self.active = false;
     }
@@ -226,11 +227,11 @@ pub fn launch(data: Launch) -> VisResult<()> {
 
     cam.start(None).unwrap();
 
-    for req in reqs {
-        unwrap_or_fail!(8, cam.queue_request(req));
-    }
+    // for req in reqs {
+    //     unwrap_or_fail!(8, cam.queue_request(req));
+    // }
 
-    let mut unused_reqs = Vec::new();
+    let mut unused_reqs = reqs;
     let pixel_format = data.format.to_string().parse().unwrap();
 
     loop {
@@ -253,18 +254,30 @@ pub fn launch(data: Launch) -> VisResult<()> {
         for conn in connections.iter_mut() {
             let mut buf = [0u8];
             let action = match conn.socket.read(&mut buf) {
-                Ok(n) if n == 1 => ClientMessage::from_id(buf[0]),
+                Ok(n) if n == 1 => {
+                    ClientMessage::from_id(buf[0])
+                },
                 Ok(_) => {continue;}
-                Err(_) => {
+                Err(e) => {
+                    if e.kind() == std::io::ErrorKind::WouldBlock {
+                        continue;
+                    }
+                    dbg!(e);
                     conn.poison();
                     None
                 }
             };
 
             match action {
-                Some(ClientMessage::Start) => conn.activate(),
-                Some(ClientMessage::Stop) => conn.deactivate(),
-                Some(ClientMessage::Disconnect) => conn.poison(),
+                Some(ClientMessage::Start) => {
+                    conn.activate()
+                }
+                Some(ClientMessage::Stop) => {
+                    conn.deactivate()
+                }
+                Some(ClientMessage::Disconnect) => {
+                    conn.poison()
+                }
                 Some(ClientMessage::Status) => {
                     // TODO status stuff
                     // - enabled
@@ -291,11 +304,11 @@ pub fn launch(data: Launch) -> VisResult<()> {
         }
 
 
-        if connections.is_empty() || connections.iter().all(|conn| !conn.is_active()){
+        if connections.is_empty() || connections.iter().all(|conn| !conn.is_active()) {
             match rx.try_recv() {
                 Ok(mut req) => {
                     // discard frame data
-                    let req = req.reuse(ReuseFlag::REUSE_BUFFERS);
+                    req.reuse(ReuseFlag::REUSE_BUFFERS);
                     unused_reqs.push(req);
                 }
                 Err(TryRecvError::Empty) => {/* do nothing */}
@@ -306,39 +319,49 @@ pub fn launch(data: Launch) -> VisResult<()> {
             continue;
         }
 
+        // we have an active connection at this point
+        while !unused_reqs.is_empty() {
+            let req = unused_reqs.pop().unwrap();
+            unwrap_or_fail_with_free!(8, &full_name, cam.queue_request(req));
+        }
+
         let mut req = match rx.recv_timeout(std::time::Duration::from_millis(10)) {
-            Ok(req) => req,
+            Ok(req) => {req},
             Err(RecvTimeoutError::Timeout) => {continue;}
             Err(RecvTimeoutError::Disconnected) => {fail_with_free!(9, &full_name, "camera disconnected");}
         };
         
         // get frame
         
-        let frame_buffer: &MemoryMappedFrameBuffer<FrameBuffer> = req.buffer(&stream).unwrap();
-        let planes = frame_buffer.data();
-        let frame_data = planes.get(0).unwrap();
-        let bytes_used = frame_buffer.metadata().unwrap().planes().get(0).unwrap().bytes_used as usize;
+        if connections.iter().any(|conn| conn.is_active()) {
+            let frame_buffer: &MemoryMappedFrameBuffer<FrameBuffer> = req.buffer(&stream).unwrap();
+            let planes = frame_buffer.data();
+            let frame_data = planes.get(0).unwrap();
+            let bytes_used = frame_buffer.metadata().unwrap().planes().get(0).unwrap().bytes_used as usize;
 
-        let frame = Frame {
-            format: pixel_format,
-            width: size.width,
-            height: size.height,
-            data: &frame_data[..bytes_used],
-        };
-        
-        for conn in connections.iter_mut() {
-            match frame.serialize(&mut conn.serializer()) {
-                Ok(_) => {/* no-op*/ }
-                Err(_) => {
-                    // there may be occasions that this isn't grounds for poisoning, 
-                    // but I don't know of any
-                    conn.poison();
-                }
+            let frame = Frame {
+                format: pixel_format,
+                width: size.width,
+                height: size.height,
+                data: frame_data[..bytes_used].to_vec(),
             };
-        }
-        // pruning dead connections
-        connections = connections.into_iter().filter(|conn| conn.is_healthy()).collect();
 
+            for conn in connections.iter_mut() {
+                match frame.serialize(&mut conn.serializer()) {
+                    Ok(_) => {/* no-op*/ 
+                        // println!("server: frame sent");
+                    }
+                    Err(_) => {
+                        // there may be occasions that this isn't grounds for poisoning, 
+                        // but I don't know of any
+                        conn.poison();
+                    }
+                };
+            }
+            // pruning dead connections
+            connections = connections.into_iter().filter(|conn| conn.is_healthy()).collect();
+
+        }
         req.reuse(ReuseFlag::REUSE_BUFFERS);
         unwrap_or_fail_with_free!(8, &full_name, cam.queue_request(req));
     }
@@ -378,26 +401,43 @@ fn get_closest_size<'a>(cfg: &'a StreamConfigurationRef<'a>, config: &Launch) ->
     let sizes = cfg.formats().sizes(format);
 
     if config.width.is_none() && config.height.is_none() {
-        sizes.get(0).copied()
+        // let true_width = sizes.iter().max_by_key(|s| s.width)?.width;
+        // sizes.into_iter().filter(|s| s.width == true_width).max_by_key(|s| s.height)
+        sizes.into_iter().max_by_key(|s| s.height * s.width)
     } else if config.width.is_none() {
         // sort solely based on height
         let height = config.height.unwrap();
-        sizes.into_iter().min_by_key(|s| {
+        let true_height = sizes.iter().min_by_key(|s| {
             s.height.abs_diff(height)
+        })?.height;
+
+        sizes.into_iter().filter(|s| s.height == true_height).max_by_key(|s| {
+            s.width
         })
     } else if config.height.is_none() {
         // sort solely based on width
         let width = config.width.unwrap();
-        sizes.into_iter().min_by_key(|s| {
+        let true_width = sizes.iter().min_by_key(|s| {
             s.width.abs_diff(width)
+        })?.width;
+
+        sizes.into_iter().filter(|s| s.width == true_width).max_by_key(|s| {
+            s.height
         })
     } else {
         // sort based on lowest dw and dh 
         let width = config.width.unwrap();
         let height = config.height.unwrap();
-        sizes.into_iter().min_by_key(|s| {
-            s.width.abs_diff(width) + s.height.abs_diff(height)
+        let true_width = sizes.iter().min_by_key(|s| {
+            s.width.abs_diff(width)
+        })?.width;
+
+        sizes.into_iter().filter(|s| s.width == true_width).min_by_key(|s| {
+            s.height.abs_diff(height)
         })
+        // sizes.into_iter().min_by_key(|s| {
+        //     s.width.abs_diff(width) + s.height.abs_diff(height)
+        // })
     }
 }
 
@@ -405,8 +445,11 @@ fn get_closest_size<'a>(cfg: &'a StreamConfigurationRef<'a>, config: &Launch) ->
 fn use_camera(name: &str) -> VisResult<()> {
     let known_file = get_or_make_known_camera_file()?;
     let mut f = unwrap_or_fail!(1, File::options().create(true).append(true).open(known_file));
-
     unwrap_or_fail!(1, f.write(format!("{}\n", name).as_bytes()));
+    
+    let pid_file = get_or_make_camera_pid_file()?;
+    let mut f = unwrap_or_fail!(1, File::options().create(true).append(true).open(pid_file));
+    unwrap_or_fail!(1, f.write(format!("{} :: {}\n", name, std::process::id()).as_bytes()));
     Ok(())
 }
 
@@ -421,5 +464,17 @@ fn free_camera(name: &str) -> VisResult<()> {
     for cam in cams.into_iter().filter(|n| n != name) {
         unwrap_or_fail!(1, f.write(format!("{}\n", cam).as_bytes()));
     }
+
+    let pid_file = get_camera_pid_file()?;
+    let pids = get_camera_pids()?;
+    let mut f = unwrap_or_fail!(1, File::options()
+                                        .truncate(true)
+                                        .create(true)
+                                        .write(true)
+                                        .open(pid_file));
+    for (cam, pid) in pids.into_iter().filter(|(c, _)| c != name) {
+        unwrap_or_fail!(1, f.write(format!("{} :: {}\n", cam, pid).as_bytes()));
+    }
+
     Ok(())
 }
