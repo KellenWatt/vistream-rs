@@ -54,6 +54,13 @@ impl PixelFormat for MJPG {
 }
 
 #[derive(Clone, Copy)]
+pub struct Luma;
+impl PixelFormat for Luma {
+    fn byte_count() -> usize {1}
+    fn proto_format() -> ProtoPixelFormat {panic!("Luma does not translate to PixelFormat");}
+}
+
+#[derive(Clone, Copy)]
 pub struct Raw<const N: usize>;
 impl<const N: usize> PixelFormat for Raw<N> {
     fn byte_count() -> usize {N}
