@@ -371,11 +371,11 @@ impl<F: frame::PixelFormat> Drop for Camera<F> {
 
 
 pub trait Locate<F: frame::PixelFormat, S: FrameSource<F>> {
-    fn locate(&mut self, source: &S) -> Result<Vec<LocationData>>;
-    fn locate_once(&mut self, source: &S) -> Result<Option<LocationData>> {
+    fn locate(&mut self, source: &mut S) -> Result<Vec<LocationData>>;
+    fn locate_once(&mut self, source: &mut S) -> Result<Option<LocationData>> {
         Ok(self.locate(source)?.get(0).copied())
     }
-    fn contains_target(&mut self, source: &S) -> Result<bool> {
+    fn contains_target(&mut self, source: &mut S) -> Result<bool> {
         Ok(self.locate(source)?.len() > 0)
     }
 }

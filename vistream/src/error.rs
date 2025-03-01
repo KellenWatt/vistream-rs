@@ -23,6 +23,18 @@ pub enum Error {
 
     #[error(transparent)]
     InEncoding(#[from] rmp_serde::decode::Error),
+
+    #[cfg(feature = "ws")]
+    #[error(transparent)]
+    WebSocket(#[from] tungstenite::Error),
+    #[cfg(feature = "ws")]
+    #[error("something went wrong with the WebSocket handshake")]
+    Handshake,
 }
+
+// #[cfg(feature = "ws")]
+// pub enum WSError {
+// 
+// }
 
 pub type Result<T> = std::result::Result<T, Error>;

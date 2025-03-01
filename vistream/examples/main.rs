@@ -14,7 +14,7 @@ fn main() {
     let mut cfg = CameraConfig::default();
     cfg.server_exe("/home/bisonbots/dev/vistream/target/debug/vistream-camera-server");
     cfg.conn_timeout(std::time::Duration::from_secs(1));
-    let mut c: Camera<MJPG> = Camera::new("lifecam", cfg).unwrap();
+    let mut c: Camera<RGB> = Camera::new("imx708", cfg).unwrap();
     // let mut c: Camera<MJPG> = Camera::new("lifecam", cfg).unwrap();
     // let mut c = MJPGSource::new(c);
     c.start();
@@ -22,7 +22,7 @@ fn main() {
     let locator = DummyLocator::new();
     // 
     // // let addr = SocketAddr::from("0.0.0.0:30202");
-    let locate_stream = LocateStream::launch("0.0.0.0:30202".parse().unwrap(), c, locator);
+    let locate_stream = LocateStream::launch("0.0.0.0:30202".parse().unwrap(), c, locator).unwrap();
 
     // std::thread::sleep(std::time::Duration::from_secs(3));
     loop {}
@@ -126,7 +126,7 @@ impl DummyLocator {
 }
 
 impl<F: PixelFormat, S: FrameSource<F>> Locate<F, S> for DummyLocator {
-    fn locate(&mut self, source: &S) -> Result<Vec<LocationData>> {
+    fn locate(&mut self, source: &mut S) -> Result<Vec<LocationData>> {
         std::thread::sleep(std::time::Duration::from_millis(100));
         let mut builder = LocationData::builder();
         builder.x(0.1);

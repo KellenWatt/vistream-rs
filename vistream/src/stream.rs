@@ -1,5 +1,5 @@
-use crate::camera::{FrameSource, Locate, Worker};
-use crate::frame::{PixelFormat, MJPG, Pixelate};
+use crate::camera::{FrameSource, Locate, Worker, Camera, CameraConfig};
+use crate::frame::{PixelFormat, Pixelate};
 use crate::error::{Result, Error};
 use vistream_protocol::stream::{ClientMessage, Status, Frame as ProtoFrame};
 
@@ -96,14 +96,15 @@ pub struct LocateStream {
 }
 
 impl LocateStream {
-    pub fn launch<F, S, L>(addr: SocketAddr, source: S, locator: L) -> LocateStream 
+    pub fn launch<F, S, L>(addr: SocketAddr, source: S, locator: L) -> Result<LocateStream> 
     where F: PixelFormat,
           S: FrameSource<F> + Send + 'static, 
           L: Locate<F, S> + Send + 'static {
+        let socket = TcpListener::bind(addr)?;
         let worker = Worker::spawn(move |kill_flag| {
-            // let mut source = source;
+            let mut source = source;
             let mut locator = locator;
-            let socket = TcpListener::bind(addr)?;
+            // let socket = TcpListener::bind(addr)?;
             socket.set_nonblocking(true)?;
             let mut connections = Vec::new();
         
@@ -129,7 +130,7 @@ impl LocateStream {
                     continue;
                 }
 
-                let loc = locator.locate(&source)?;
+                let loc = locator.locate(&mut source)?;
                 // seriously, fix this error
                 let loc_buf = make_response(ClientMessage::Start, loc).map_err(|_| Error::Unknown)?;
 
@@ -172,9 +173,9 @@ impl LocateStream {
 
             Ok(())
         });
-        LocateStream {
+        Ok(LocateStream {
             worker
-        }
+        })
     }
 
     pub fn stop(mut self) -> Result<()> {
@@ -190,11 +191,12 @@ pub struct FrameStream{
 }
 
 impl FrameStream {
-    pub fn launch<S>(addr: SocketAddr, source: S) -> FrameStream
-    where S: FrameSource<MJPG> + Send + 'static {
+    pub fn launch<S, F>(addr: SocketAddr, source: S) -> Result<FrameStream>
+    where S: FrameSource<F> + Send + 'static,
+          F: PixelFormat {
+        let socket = TcpListener::bind(addr)?;
         let worker = Worker::spawn(move |kill_flag| {
             let mut source = source;
-            let socket = TcpListener::bind(addr)?;
             socket.set_nonblocking(true)?;
             let mut connections = Vec::new();
         
@@ -227,6 +229,8 @@ impl FrameStream {
                             height: frame.height() as u32,
                             data: frame.bytes(),
                         };
+                        // FIXME make_response presupposes that data is JSON compatibly, which the
+                        // frame data is very much not
                         make_response(ClientMessage::Start, frame).map_err(|_| Error::Unknown)?
                     }
                     None => {
@@ -273,9 +277,9 @@ impl FrameStream {
 
             Ok(())
         });
-        FrameStream {
+        Ok(FrameStream {
             worker
-        }
+        })
     }
     
     pub fn stop(mut self) -> Result<()> {
@@ -285,3 +289,23 @@ impl FrameStream {
         }
     }
 }
+
+pub struct PassthroughStream {
+    stream: FrameStream,
+}
+
+impl PassthroughStream {
+    pub fn launch<F>(addr: SocketAddr, name: &str, cfg: CameraConfig) -> Result<PassthroughStream> 
+    where F: PixelFormat + 'static {
+        let cam = Camera::<F>::new(name, cfg)?;
+        let stream = FrameStream::launch(addr, cam)?;
+        Ok(PassthroughStream {
+            stream,
+        })
+    }
+
+    pub fn stop(self) -> Result<()> {
+        self.stream.stop()
+    }
+}
+

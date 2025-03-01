@@ -14,7 +14,7 @@ pub struct LocationData {
     pub id: Option<u32>,
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct LocationDataBuilder {
     x: Option<f64>,
     y: Option<f64>,

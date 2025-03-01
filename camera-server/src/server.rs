@@ -237,6 +237,7 @@ pub fn launch(data: Launch) -> VisResult<()> {
     loop {
         match listener.accept() {
             Ok(conn) => {
+                println!("connection from: {:?}", conn.1);
                 connections.push(Connection::new(conn));
             }
             Err(e) => {
@@ -267,6 +268,7 @@ pub fn launch(data: Launch) -> VisResult<()> {
                     None
                 }
             };
+            println!("command got: {:?}", action);
 
             match action {
                 Some(ClientMessage::Start) => {
@@ -303,8 +305,8 @@ pub fn launch(data: Launch) -> VisResult<()> {
             }
         }
 
-
         if connections.is_empty() || connections.iter().all(|conn| !conn.is_active()) {
+            // println!("no active connections (of {})", connections.len());
             match rx.try_recv() {
                 Ok(mut req) => {
                     // discard frame data
@@ -318,6 +320,7 @@ pub fn launch(data: Launch) -> VisResult<()> {
             std::thread::sleep(std::time::Duration::from_millis(20));
             continue;
         }
+        // println!("{} active connections", connections.iter().map(|conn| conn.is_active()).count());
 
         // we have an active connection at this point
         while !unused_reqs.is_empty() {
@@ -339,6 +342,8 @@ pub fn launch(data: Launch) -> VisResult<()> {
             let frame_data = planes.get(0).unwrap();
             let bytes_used = frame_buffer.metadata().unwrap().planes().get(0).unwrap().bytes_used as usize;
 
+
+            println!("server: frame len: {}", bytes_used);
             let frame = Frame {
                 format: pixel_format,
                 width: size.width,
@@ -346,6 +351,7 @@ pub fn launch(data: Launch) -> VisResult<()> {
                 data: frame_data[..bytes_used].to_vec(),
             };
 
+            println!("server: msg len: {}", rmp_serde::to_vec(&frame).unwrap().len());
             for conn in connections.iter_mut() {
                 match frame.serialize(&mut conn.serializer()) {
                     Ok(_) => {/* no-op*/ 
