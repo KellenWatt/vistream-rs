@@ -6,6 +6,7 @@ use crate::shared::*;
 use serde::{Serialize};
 use rmp_serde::{Serializer};
 
+
 macro_rules! unwrap_or_fail_with_free {
     ($code: expr, $name: expr, $value: expr) => {
         match $value {
@@ -93,11 +94,11 @@ struct Connection {
 impl Connection {
     fn new(conn: (UnixStream, SocketAddr)) -> Connection {
         
-        conn.0.set_nonblocking(true).unwrap();
+        conn.0.set_nonblocking(false).unwrap();
+        conn.0.set_read_timeout(Some(std::time::Duration::from_millis(1))).unwrap();
         Connection {
             socket: conn.0,
             addr: conn.1,
-            // serializer: Serializer::new(conn.0),
             healthy: true,
             active: false,
         }
@@ -108,7 +109,6 @@ impl Connection {
     }
 
     fn poison(&mut self) {
-        // println!("server: poisoning connection");
         self.healthy = false;
         self.active = false;
     }
@@ -342,16 +342,17 @@ pub fn launch(data: Launch) -> VisResult<()> {
             let frame_data = planes.get(0).unwrap();
             let bytes_used = frame_buffer.metadata().unwrap().planes().get(0).unwrap().bytes_used as usize;
 
+            let data = frame_data[..bytes_used].to_vec();
 
-            println!("server: frame len: {}", bytes_used);
+            // .to_vec()println!("server: frame len: {}", data.len());
             let frame = Frame {
                 format: pixel_format,
                 width: size.width,
                 height: size.height,
-                data: frame_data[..bytes_used].to_vec(),
+                data,
             };
 
-            println!("server: msg len: {}", rmp_serde::to_vec(&frame).unwrap().len());
+            // println!("server: msg len: {}", rmp_serde::to_vec(&frame).unwrap().len());
             for conn in connections.iter_mut() {
                 match frame.serialize(&mut conn.serializer()) {
                     Ok(_) => {/* no-op*/ 

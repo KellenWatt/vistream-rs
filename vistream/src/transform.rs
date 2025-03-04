@@ -1,7 +1,7 @@
 use std::sync::Arc;
-use crate::frame::{PixelFormat, Frame};
+use crate::frame::{Pixelate, PixelFormat, Frame};
 #[cfg(feature = "jpeg")]
-use crate::frame::{Pixelate, MJPG};
+use crate::frame::{MJPG};
 use crate::camera::{FrameSource};
 #[allow(unused_imports)]
 use crate::error::{Result, Error};
@@ -359,7 +359,6 @@ impl<S: FrameSource<RGB>> FrameSource<Luma> for Convert<RGB, Luma, S> {
         }
 
         let out = Frame::new(data, frame.width(), frame.height());
-        println!("len: {} ; bytes: {}", out.len(), out.byte_len());
 
         Ok(Some(Arc::new(out)))
     }

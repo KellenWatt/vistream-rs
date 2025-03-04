@@ -39,7 +39,8 @@ struct Connection {
 impl Connection {
     fn new(conn: (TcpStream, SocketAddr)) -> Connection {
         
-        conn.0.set_nonblocking(true).unwrap();
+        conn.0.set_nonblocking(false).unwrap();
+        conn.0.set_read_timeout(Some(std::time::Duration::from_nanos(500))).unwrap();
         Connection {
             socket: conn.0,
             addr: conn.1,

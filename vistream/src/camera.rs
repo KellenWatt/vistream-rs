@@ -18,6 +18,7 @@ use serde::{Deserialize};
 
 use vistream_protocol::camera::{self, ClientMessage, Status};
 use vistream_protocol::stream::LocationData;
+// use vistream_protocol::network::{BufferedStream};
 // use vistream_protocol::fs::*;
 
 use crate::frame::{self, Frame};
@@ -224,15 +225,25 @@ impl<F: frame::PixelFormat> Camera<F> {
             // Should really do something here to check for success, since there's always a
             // possible race condition. For now, just assume it works.
         } else { None };
+        // println!("camera launched");
         
         std::thread::sleep(std::time::Duration::from_millis(10));
         let addr = SocketAddr::from_abstract_name(&true_name)?;
         let mut source = None;
         let start = std::time::Instant::now();
         while source.is_none() {
-            if let Ok(conn) =  UnixStream::connect_addr(&addr) {
-                source = Some(conn);
+            let conn = UnixStream::connect_addr(&addr);
+            match conn {
+                Ok(conn) => {
+                    source = Some(conn)
+                }
+                Err(_e) => {
+                    // println!("{}", e);
+                }
             }
+            // if let Ok(conn) = BufferedStream::<UnixStream>::connect(&addr) {
+            //     source = Some(conn)
+            // }
             if let Some(ref timeout) = cfg.conn_timeout {
                 if &start.elapsed() >= timeout {
                     return Err(Error::Timeout);
@@ -241,12 +252,14 @@ impl<F: frame::PixelFormat> Camera<F> {
         }
         // let mut source = UnixStream::connect_addr(&addr)?;
         let mut source = source.unwrap();
+        // println!("connection established");
 
         //  TODO make the Resizer
         // - image size - set up resizer if necessary
 
         source.write(&[ClientMessage::Status.id()])?;
-        let status = Status::deserialize(&mut Deserializer::new(&source))?;
+        source.flush()?;
+        let status = Status::deserialize(&mut Deserializer::new(&mut source))?;
 
         println!("{:?}", F::proto_format());
         println!("{:?}", status);
@@ -275,7 +288,7 @@ impl<F: frame::PixelFormat> Camera<F> {
         let worker_frame = last_frame.clone();
         let worker_frame_id = last_frame_id.clone();
         let frame_worker = Worker::spawn(move |kill_flag: Arc<AtomicBool>| {
-            let mut deserializer = Deserializer::new(&source);
+            let mut deserializer = Deserializer::new(&mut source);
 
             while !kill_flag.load(Ordering::Acquire) {
                 let frame_msg = camera::Frame::deserialize(&mut deserializer)?;
@@ -314,6 +327,7 @@ impl<F: frame::PixelFormat> FrameSource<F> for Camera<F> {
             if self.frame_worker.is_joinable() {
                 // ignore the error, since something has already gone wrong
                 let _ = self.control.write(&[ClientMessage::Disconnect.id()]);
+                self.control.flush()?;
                 return match self.frame_worker.join() {
                     Some(e) => Err(e),
                     None => Ok(None),
@@ -334,6 +348,7 @@ impl<F: frame::PixelFormat> FrameSource<F> for Camera<F> {
                 // checking all the boxes, just in case I'm stupid.
                 self.frame_worker.kill();
                 let _ = self.control.write(&[ClientMessage::Disconnect.id()]);
+                self.control.flush()?;
                 match self.frame_worker.join() {
                     Some(e) => Err(e),
                     None => Ok(None),
@@ -344,11 +359,13 @@ impl<F: frame::PixelFormat> FrameSource<F> for Camera<F> {
 
     fn start(&mut self) -> Result<()> {
         self.control.write(&[ClientMessage::Start.id()])?;
+        self.control.flush()?;
         Ok(())
     }
 
     fn stop(&mut self) -> Result<()> {
         self.control.write(&[ClientMessage::Stop.id()])?;
+        self.control.flush()?;
         Ok(())
     }
 
@@ -360,7 +377,9 @@ impl<F: frame::PixelFormat> FrameSource<F> for Camera<F> {
 impl<F: frame::PixelFormat> Drop for Camera<F> {
     fn drop(&mut self) {
         if !self.frame_worker.is_finished() {
+            // ignore any write errors. We're in cleanup mode.
             let _ = self.control.write(&[ClientMessage::Disconnect.id()]);
+            let _ = self.control.flush(); 
             self.frame_worker.kill();
             self.frame_worker.join();
         } else {
