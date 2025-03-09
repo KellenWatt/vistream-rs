@@ -228,7 +228,7 @@ impl FrameStream {
                         let frame = ProtoFrame {
                             width: frame.width() as u32,
                             height: frame.height() as u32,
-                            data: frame.bytes(),
+                            data: frame.bytes().into(),
                         };
                         // FIXME make_response presupposes that data is JSON compatibly, which the
                         // frame data is very much not

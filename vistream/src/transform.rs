@@ -17,7 +17,7 @@ pub use turbojpeg::{Compressor, Subsamp};
 
 #[cfg(feature = "jpeg")]
 #[allow(dead_code)]
-pub struct MJPGSource<F: PixelFormat, S: FrameSource<F>> {
+pub struct JPGSource<F: PixelFormat, S: FrameSource<F>> {
     source: S,
     last_frame: usize,
     compressor: Compressor,
@@ -27,13 +27,13 @@ pub struct MJPGSource<F: PixelFormat, S: FrameSource<F>> {
 
 #[cfg(feature = "jpeg")]
 #[allow(dead_code)]
-impl<F: PixelFormat, S: FrameSource<F>> MJPGSource<F, S> {
-    pub fn new(source: S) -> MJPGSource<F, S> {
+impl<F: PixelFormat, S: FrameSource<F>> JPGSource<F, S> {
+    pub fn new(source: S) -> JPGSource<F, S> {
         Self::new_with_compressor(source, Compressor::new().unwrap())
     }
 
-    pub fn new_with_compressor(source: S, compressor: Compressor) -> MJPGSource<F, S> {
-        MJPGSource {
+    pub fn new_with_compressor(source: S, compressor: Compressor) -> JPGSource<F, S> {
+        JPGSource {
             source,
             last_frame: 0,
             compressor,
@@ -46,7 +46,7 @@ impl<F: PixelFormat, S: FrameSource<F>> MJPGSource<F, S> {
 macro_rules! mjpg_source {
     ($fmt:ty, $jpeg:expr) => {
         #[cfg(feature = "jpeg")]
-        impl<S: FrameSource<$fmt>> FrameSource<MJPG> for MJPGSource<$fmt, S> {
+        impl<S: FrameSource<$fmt>> FrameSource<MJPG> for JPGSource<$fmt, S> {
             fn get_frame(&mut self) -> Result<Option<Arc<Frame<MJPG>>>> {
                 let Some(frame) = self.source.get_frame()? else {
                     return Ok(None);
@@ -107,7 +107,7 @@ mjpg_source!(crate::frame::Luma, JpegPixelFormat::GRAY);
 
 #[allow(dead_code)]
 #[cfg(feature = "jpeg")]
-pub struct MJPGUnpacker<F: PixelFormat, S: FrameSource<MJPG>> {
+pub struct JPGUnpacker<F: PixelFormat, S: FrameSource<MJPG>> {
     source: S,
     last_frame: usize,
     decompressor: Decompressor,
@@ -117,13 +117,13 @@ pub struct MJPGUnpacker<F: PixelFormat, S: FrameSource<MJPG>> {
 
 #[allow(dead_code)]
 #[cfg(feature = "jpeg")]
-impl<F: PixelFormat, S: FrameSource<MJPG>> MJPGUnpacker<F, S> {
-    pub fn new(source: S) -> MJPGUnpacker<F, S> {
+impl<F: PixelFormat, S: FrameSource<MJPG>> JPGUnpacker<F, S> {
+    pub fn new(source: S) -> JPGUnpacker<F, S> {
         Self::new_with_decompressor(source, Decompressor::new().unwrap())
     }
 
-    pub fn new_with_decompressor(source: S, decompressor: Decompressor) -> MJPGUnpacker<F, S> {
-        MJPGUnpacker {
+    pub fn new_with_decompressor(source: S, decompressor: Decompressor) -> JPGUnpacker<F, S> {
+        JPGUnpacker {
             source,
             last_frame: 0,
             decompressor,
@@ -136,7 +136,7 @@ impl<F: PixelFormat, S: FrameSource<MJPG>> MJPGUnpacker<F, S> {
 macro_rules! mjpg_unpack {
     ($jpeg:expr, $fmt:ty) => {
         #[cfg(feature = "jpeg")]
-        impl<S: FrameSource<MJPG>> FrameSource<$fmt> for MJPGUnpacker<$fmt, S> {
+        impl<S: FrameSource<MJPG>> FrameSource<$fmt> for JPGUnpacker<$fmt, S> {
             fn get_frame(&mut self) -> Result<Option<Arc<Frame<$fmt>>>> {
                 let Some(frame) = self.source.get_frame()? else {
                     return Ok(None);

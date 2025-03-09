@@ -148,9 +148,9 @@ pub struct Status {
 
 // No format listed. Will always be jpg
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct Frame<'a> {
+pub struct Frame {
     pub width: u32,
     pub height: u32,
     #[serde(with = "serde_bytes")]
-    pub data: &'a [u8]
+    pub data: Vec<u8>
 }
