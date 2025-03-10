@@ -168,7 +168,7 @@ impl LocateStream {
                         continue;
                     }
 
-                    conn.write(&loc_buf)?; 
+                    conn.write_all(&loc_buf)?; 
                 }
             }
 
@@ -198,7 +198,6 @@ impl FrameStream {
         let socket = TcpListener::bind(addr)?;
         let worker = Worker::spawn(move |kill_flag| {
             let mut source = source;
-            socket.set_nonblocking(true)?;
             let mut connections = Vec::new();
         
             while !kill_flag.load(Ordering::Acquire) {
@@ -228,11 +227,15 @@ impl FrameStream {
                         let frame = ProtoFrame {
                             width: frame.width() as u32,
                             height: frame.height() as u32,
-                            data: frame.bytes().into(),
+                            data: frame.bytes().clone().into(),
                         };
                         // FIXME make_response presupposes that data is JSON compatibly, which the
                         // frame data is very much not
-                        make_response(ClientMessage::Start, frame).map_err(|_| Error::Unknown)?
+
+                        let mut buf = Vec::with_capacity(frame.data.len() + 20); // I don't remember how
+                                                                                 // big the rest ist
+                        frame.serialize(&mut rmp_serde::Serializer::new(&mut buf)).unwrap();
+                        buf
                     }
                     None => {
                         Vec::new()
@@ -271,7 +274,7 @@ impl FrameStream {
                     }
 
                     if frame_buf.len() > 0 {
-                        conn.write(&frame_buf)?; 
+                        conn.write_all(&frame_buf)?; 
                     }
                 }
             }
