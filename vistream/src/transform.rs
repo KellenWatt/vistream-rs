@@ -147,8 +147,9 @@ macro_rules! mjpg_unpack {
                 let height = frame.height();
 
                 if self.buf.is_empty() {
-                    self.buf.reserve(width * height);
-                    unsafe{self.buf.set_len(width * height)};
+                    let size = width * height * <$fmt>::byte_count();
+                    self.buf.reserve(size);
+                    unsafe{self.buf.set_len(size)};
                 }
 
                 let image: Image<&mut [u8]> = Image {
