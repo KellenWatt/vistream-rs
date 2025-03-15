@@ -133,7 +133,11 @@ impl LocateStream {
 
                 let loc = locator.locate(&mut source)?;
                 // seriously, fix this error
-                let loc_buf = make_response(ClientMessage::Start, loc).map_err(|_| Error::Unknown)?;
+                let loc_buf = if let Some(loc) = loc {
+                    Some(make_response(ClientMessage::Start, loc).map_err(|_| Error::Unknown)?)
+                } else {
+                    None
+                };
 
                 for conn in connections.iter_mut() {
                     // listen for messages from, respond accordingly
@@ -168,7 +172,9 @@ impl LocateStream {
                         continue;
                     }
 
-                    conn.write_all(&loc_buf)?; 
+                    if let Some(ref loc_buf) = loc_buf {
+                        conn.write_all(&loc_buf)?; 
+                    }
                 }
             }
 

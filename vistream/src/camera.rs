@@ -390,12 +390,18 @@ impl<F: frame::PixelFormat> Drop for Camera<F> {
 
 
 pub trait Locate<F: frame::PixelFormat, S: FrameSource<F>> {
-    fn locate(&mut self, source: &mut S) -> Result<Vec<LocationData>>;
+    fn locate(&mut self, source: &mut S) -> Result<Option<Vec<LocationData>>>;
     fn locate_once(&mut self, source: &mut S) -> Result<Option<LocationData>> {
-        Ok(self.locate(source)?.get(0).copied())
+        Ok(match self.locate(source)? {
+            Some(locs) => locs.get(0).copied(),
+            None => None,
+        })
     }
     fn contains_target(&mut self, source: &mut S) -> Result<bool> {
-        Ok(self.locate(source)?.len() > 0)
+        Ok(match self.locate(source)? {
+            Some(locs) => locs.len() > 0,
+            None => false,
+        })
     }
 }
 
@@ -457,6 +463,11 @@ impl<F: frame::PixelFormat, S: FrameSource<F>> FrameRateLimiter<F, S> {
             last_id,
             _format: PhantomData,
         }
+    }
+
+    pub fn new_framerate(source: S, frame_rate: f64) -> FrameRateLimiter<F, S> {
+        let frame_delay = Duration::from_secs_f64(frame_rate.recip());
+        FrameRateLimiter::new(source, frame_delay)
     }
 
     pub fn set_frame_delay(&mut self, frame_delay: Duration) {
