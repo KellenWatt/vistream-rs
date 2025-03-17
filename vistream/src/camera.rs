@@ -1,5 +1,7 @@
+#![allow(unused_imports)]
 #![allow(dead_code)]
 use std::os::unix::net::{SocketAddr, UnixStream};
+#[cfg(target_os = "linux")]
 use std::os::linux::net::{SocketAddrExt};
 
 use std::sync::{RwLock, Arc};
@@ -53,6 +55,7 @@ pub trait FrameSource<F: frame::PixelFormat> {
     fn last_frame_id(&self) -> usize;
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Default, Clone)]
 pub struct CameraConfig {
     buffer_count: Option<u32>,
@@ -63,6 +66,7 @@ pub struct CameraConfig {
     conn_timeout: Option<std::time::Duration>,
 }
 
+#[cfg(target_os = "linux")]
 impl CameraConfig {
     pub fn new() -> CameraConfig {
         CameraConfig::default()
@@ -166,6 +170,7 @@ impl Worker {
     }
 }
 
+#[cfg(target_os = "linux")]
 pub struct Camera<F: frame::PixelFormat + 'static> {
     // unambiguous camera name (most likely the id) 
     name: String,
@@ -184,6 +189,7 @@ pub struct Camera<F: frame::PixelFormat + 'static> {
     height: usize,
 }
 
+#[cfg(target_os = "linux")]
 impl<F: frame::PixelFormat> Camera<F> {
     pub fn new(name: &str, cfg: CameraConfig) -> Result<Camera<F>> {
         let server_exe = cfg.server_exe.unwrap_or("vistream-camera-server".into());
@@ -319,6 +325,7 @@ impl<F: frame::PixelFormat> Camera<F> {
 }
 
 
+#[cfg(target_os = "linux")]
 impl<F: frame::PixelFormat> FrameSource<F> for Camera<F> {
     fn get_frame(&mut self) -> Result<Option<Arc<Frame<F>>>> {
         // If the frame_worker has stopped for any reason, return nothing,
@@ -374,6 +381,7 @@ impl<F: frame::PixelFormat> FrameSource<F> for Camera<F> {
     }
 }
 
+#[cfg(target_os = "linux")]
 impl<F: frame::PixelFormat> Drop for Camera<F> {
     fn drop(&mut self) {
         if !self.frame_worker.is_finished() {

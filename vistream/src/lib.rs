@@ -5,7 +5,9 @@ pub mod error;
 pub mod transform;
 pub mod client;
 
-pub use crate::camera::{Camera, CameraConfig, FrameSource, Locate};
+#[cfg(target_os = "linux")]
+pub use crate::camera::{Camera, CameraConfig};
+pub use crate::camera::{FrameSource, Locate};
 pub use vistream_protocol::stream::{LocationData};
 pub use crate::frame::{Frame, Pixelate};
 

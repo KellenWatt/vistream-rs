@@ -1,5 +1,5 @@
 use crate::camera::{Worker, FrameSource};
-use crate::frame::{Frame, PixelFormat};
+use crate::frame::{Frame, PixelFormat, MJPG};
 use crate::error::{Result, Error};
 use vistream_protocol::stream::{ClientMessage, Frame as ProtoFrame, LocationData};
 use std::net::{TcpStream, SocketAddr};
@@ -13,16 +13,15 @@ use serde::Deserialize;
 
 use std::marker::PhantomData;
 
-pub struct FrameClient<F: PixelFormat> {
+pub struct FrameClient {
     worker: Worker,
     control: TcpStream,
-    last_frame: Arc<RwLock<Option<Arc<Frame<F>>>>>,
+    last_frame: Arc<RwLock<Option<Arc<Frame<MJPG>>>>>,
     last_frame_id: Arc<AtomicUsize>,
-    _format: PhantomData<F>,
 }
 
-impl<F: PixelFormat + 'static> FrameClient<F> {
-    pub fn connect(addr: SocketAddr) -> Result<FrameClient<F>> {
+impl FrameClient {
+    pub fn connect(addr: SocketAddr) -> Result<FrameClient> {
         let socket = TcpStream::connect(addr)?;
         let control = socket.try_clone()?;
 
@@ -36,6 +35,7 @@ impl<F: PixelFormat + 'static> FrameClient<F> {
             
             while !kill_flag.load(Ordering::Acquire) {
                 let proto_frame = ProtoFrame::deserialize(&mut deserializer)?;
+                println!("proto data: {}", proto_frame.data.len());
                 let data = proto_frame.data;
                 let frame = Frame::new(data, proto_frame.width as usize, proto_frame.height as usize);
                 *worker_frame.write().unwrap() = Some(Arc::new(frame));
@@ -50,13 +50,12 @@ impl<F: PixelFormat + 'static> FrameClient<F> {
             control,
             last_frame,
             last_frame_id,
-            _format: PhantomData,
         })
     }
 }
 
-impl<F: PixelFormat> FrameSource<F> for FrameClient<F> {
-    fn get_frame(&mut self) -> Result<Option<Arc<Frame<F>>>> {
+impl FrameSource<MJPG> for FrameClient {
+    fn get_frame(&mut self) -> Result<Option<Arc<Frame<MJPG>>>> {
         // If the frame_worker has stopped for any reason, return nothing,
         // except for the first time, where it returns the error causing it.
         if self.worker.is_finished() {

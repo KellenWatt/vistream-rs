@@ -1,4 +1,7 @@
-use crate::camera::{FrameSource, Locate, Worker, Camera, CameraConfig};
+#![allow(unused_imports)]
+use crate::camera::{FrameSource, Locate, Worker};
+#[cfg(target_os = "linux")]
+use crate::camera::{Camera, CameraConfig};
 use crate::frame::{PixelFormat, Pixelate};
 use crate::error::{Result, Error};
 use vistream_protocol::stream::{ClientMessage, Status, Frame as ProtoFrame};
@@ -299,11 +302,12 @@ impl FrameStream {
         }
     }
 }
-
+#[cfg(target_os = "linux")]
 pub struct PassthroughStream {
     stream: FrameStream,
 }
 
+#[cfg(target_os = "linux")]
 impl PassthroughStream {
     pub fn launch<F>(addr: SocketAddr, name: &str, cfg: CameraConfig) -> Result<PassthroughStream> 
     where F: PixelFormat + 'static {
