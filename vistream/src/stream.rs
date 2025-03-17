@@ -205,6 +205,7 @@ impl FrameStream {
     where S: FrameSource<F> + Send + 'static,
           F: PixelFormat {
         let socket = TcpListener::bind(addr)?;
+        socket.set_nonblocking(true)?;
         let worker = Worker::spawn(move |kill_flag| {
             let mut source = source;
             let mut connections = Vec::new();
@@ -238,8 +239,6 @@ impl FrameStream {
                             height: frame.height() as u32,
                             data: frame.bytes().clone().into(),
                         };
-                        // FIXME make_response presupposes that data is JSON compatibly, which the
-                        // frame data is very much not
 
                         let mut buf = Vec::with_capacity(frame.data.len() + 20); // I don't remember how
                                                                                  // big the rest ist
@@ -250,7 +249,7 @@ impl FrameStream {
                         Vec::new()
                     }
                 };
-                
+               
                 for conn in connections.iter_mut() {
                     // listen for messages from, respond accordingly
                     // if conn active and healthy, send loc
