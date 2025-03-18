@@ -35,7 +35,6 @@ impl FrameClient {
             
             while !kill_flag.load(Ordering::Acquire) {
                 let proto_frame = ProtoFrame::deserialize(&mut deserializer)?;
-                println!("proto data: {}", proto_frame.data.len());
                 let data = proto_frame.data;
                 let frame = Frame::new(data, proto_frame.width as usize, proto_frame.height as usize);
                 *worker_frame.write().unwrap() = Some(Arc::new(frame));
@@ -51,6 +50,13 @@ impl FrameClient {
             last_frame,
             last_frame_id,
         })
+    }
+}
+
+impl Drop for FrameClient {
+    fn drop(&mut self) {
+        self.worker.join();
+        self.control.shutdown(std::net::Shutdown::Both);
     }
 }
 
