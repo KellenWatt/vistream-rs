@@ -231,7 +231,11 @@ impl FrameStream {
                     continue;
                 }
                
-                let frame = source.get_frame()?;
+                let frame = if connections.iter().any(|c| c.is_active()) {
+                    source.get_frame()?
+                } else {
+                    None
+                };
                 let frame_buf = match frame {
                     Some(frame) => {
                         let frame = ProtoFrame {
@@ -258,9 +262,9 @@ impl FrameStream {
                         Some(1) => {
                             // respond as appropriate
                             match ClientMessage::from_id(buf[0]) {
-                                Some(ClientMessage::Start) => conn.activate(),
-                                Some(ClientMessage::Stop) => conn.deactivate(),
-                                Some(ClientMessage::Disconnect) => conn.poison(),
+                                Some(ClientMessage::Start) => {println!("client starting"); conn.activate()},
+                                Some(ClientMessage::Stop) => {println!("client stopping"); conn.deactivate()},
+                                Some(ClientMessage::Disconnect) => {println!("client disconnecting"); conn.poison()},
                                 Some(ClientMessage::Status) => {
                                     let resp = make_response(ClientMessage::Status, Status {
                                         enabled: conn.is_active(),
