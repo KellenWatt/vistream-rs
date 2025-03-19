@@ -23,6 +23,9 @@ pub struct FrameClient {
 impl FrameClient {
     pub fn connect(addr: SocketAddr) -> Result<FrameClient> {
         let socket = TcpStream::connect(addr)?;
+        // Dear future self: If something is breaking in the FrameClient, it's probably because of
+        // this line. Yes, that means you need to actually improve your socket handling.
+        socket.set_read_timeout(Some(std::time::Duration::from_secs(1)));
         let control = socket.try_clone()?;
 
         let last_frame = Arc::new(RwLock::new(None));
