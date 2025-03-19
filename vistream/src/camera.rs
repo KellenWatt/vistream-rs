@@ -1,5 +1,7 @@
 #![allow(unused_imports)]
 #![allow(dead_code)]
+
+#[cfg(target_os = "linux")]
 use std::os::unix::net::{SocketAddr, UnixStream};
 #[cfg(target_os = "linux")]
 use std::os::linux::net::{SocketAddrExt};
