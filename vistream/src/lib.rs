@@ -22,8 +22,8 @@ pub unsafe fn init() -> crate::error::Result<()> {
     use vistream_protocol::fs::{get_known_camera_file, get_camera_pid_file};
     use std::fs::remove_file;
     let cam_file = get_known_camera_file().unwrap();
-    remove_file(cam_file);
+    let _ = remove_file(cam_file);
     let pid_file = get_camera_pid_file().unwrap();
-    remove_file(pid_file);
+    let _ = remove_file(pid_file);
     Ok(())
 }

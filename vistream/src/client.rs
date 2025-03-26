@@ -1,5 +1,5 @@
 use crate::camera::{Worker, FrameSource};
-use crate::frame::{Frame, PixelFormat, MJPG};
+use crate::frame::{Frame, MJPG};
 use crate::error::{Result, Error};
 use vistream_protocol::stream::{ClientMessage, Frame as ProtoFrame, LocationData};
 use std::net::{TcpStream, SocketAddr};
@@ -10,8 +10,6 @@ use std::sync::atomic::{Ordering, AtomicUsize};
 
 use rmp_serde::decode::{Deserializer};
 use serde::Deserialize;
-
-use std::marker::PhantomData;
 
 pub struct FrameClient {
     worker: Worker,
@@ -25,7 +23,7 @@ impl FrameClient {
         let socket = TcpStream::connect(addr)?;
         // Dear future self: If something is breaking in the FrameClient, it's probably because of
         // this line. Yes, that means you need to actually improve your socket handling.
-        socket.set_read_timeout(Some(std::time::Duration::from_secs(1)));
+        let _ = socket.set_read_timeout(Some(std::time::Duration::from_secs(1)));
         let control = socket.try_clone()?;
 
         let last_frame = Arc::new(RwLock::new(None));
@@ -59,7 +57,7 @@ impl FrameClient {
 impl Drop for FrameClient {
     fn drop(&mut self) {
         self.worker.join();
-        self.control.shutdown(std::net::Shutdown::Both);
+        let _ = self.control.shutdown(std::net::Shutdown::Both);
     }
 }
 
@@ -130,6 +128,7 @@ pub struct LocateClient {
 impl LocateClient {
     pub fn connect(addr: SocketAddr) -> Result<LocateClient> {
         let socket = TcpStream::connect(addr)?;
+        let _ = socket.set_read_timeout(Some(std::time::Duration::from_secs(1)));
         let control = socket.try_clone()?;
 
         let last_data = Arc::new(RwLock::new(None));

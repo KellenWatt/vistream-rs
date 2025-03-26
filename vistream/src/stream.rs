@@ -161,7 +161,7 @@ impl LocateStream {
                                         framerate: 0.0,
                                     }).map_err(|_| Error::Unknown)?;
                                     
-                                    if let Err(e) =  conn.write(&resp) {
+                                    if let Err(_e) =  conn.write(&resp) {
                                         conn.poison();
                                     }
                                 }
@@ -179,7 +179,7 @@ impl LocateStream {
                     }
 
                     if let Some(ref loc_buf) = loc_buf {
-                        if let Err(e) = conn.write_all(&loc_buf) {
+                        if let Err(_e) = conn.write_all(&loc_buf) {
                             conn.poison();
                         }
                     }
@@ -276,7 +276,7 @@ impl FrameStream {
                                         healthy: conn.is_healthy(),
                                         framerate: 0.0,
                                     }).map_err(|_| Error::Unknown)?;
-                                    if let Err(e) =  conn.write(&resp) {
+                                    if let Err(_e) =  conn.write(&resp) {
                                         conn.poison();
                                     }
                                 }
@@ -293,7 +293,7 @@ impl FrameStream {
                     }
 
                     if frame_buf.len() > 0 {
-                        if let Err(e) = conn.write_all(&frame_buf) {
+                        if let Err(_e) = conn.write_all(&frame_buf) {
                             conn.poison();
                         }
                     }
